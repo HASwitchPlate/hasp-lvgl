@@ -1560,8 +1560,14 @@ static void http_handle_gui()
 <option value="4">180 degrees - mirrored</option>
 <option value="5">270 degrees - mirrored</option>
 </select></div>
-</div>
-<div class="row">
+</div>)";
+#ifdef NOISE_REDUCTION
+    html[min(i++, len)] = R"(<div class="row">
+<div class="col-25"><label for="noise_reduction">Noise Reduction</label></div>
+<div class="col-75"><input type="number" id="noise_reduction" min="0" max="15" v-model="config.gui.noise_reduction"></div>
+</div>)";
+#endif
+    html[min(i++, len)] = R"(<div class="row">
 <div class="col-25"></div>
 <div class="col-75"><input type="checkbox" id="invert" @vue:mounted="config.gui.invert = !!config.gui.invert" v-model="config.gui.invert">
 <label for="invert">Invert Colors</label></div>

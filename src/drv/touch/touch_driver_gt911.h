@@ -14,6 +14,9 @@ class TouchGt911 : public BaseTouch {
   public:
     IRAM_ATTR bool read(lv_indev_drv_t* indev_driver, lv_indev_data_t* data);
     void init(int w, int h);
+#ifdef NOISE_REDUCTION
+    void setup_noise_reduction(uint8_t nr_level);
+#endif
 };
 
 } // namespace dev
