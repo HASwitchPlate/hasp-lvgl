@@ -36,7 +36,19 @@ typedef struct
     int32_t max;
     int32_t val;
     bool power;
+#if USE_OBJ_ALIAS > 0
+    uint16_t alias;
+#endif
 } hasp_update_value_t;
+
+#if  USE_OBJ_ALIAS > 0
+typedef struct
+{
+    const char* topic_p;
+    const char* payload;
+    bool update;
+} hasp_cmd_process_data_t;
+#endif
 
 enum lv_hasp_obj_type_t {
     /* Containers */
@@ -99,6 +111,10 @@ void hasp_new_object(const JsonObject& config, uint8_t& saved_page_id);
 lv_obj_t* hasp_find_obj_from_parent_id(lv_obj_t* parent, uint8_t objid);
 lv_obj_t* hasp_find_obj_from_page_id(uint8_t pageid, uint8_t objid);
 bool hasp_find_id_from_obj(const lv_obj_t* obj, uint8_t* pageid, uint8_t* objid);
+
+#if USE_OBJ_ALIAS > 0
+lv_obj_t* hasp_find_obj_from_alias(const lv_obj_t* obj, uint16_t alias, bool toreturn, hasp_cmd_process_data_t *data);
+#endif  // #if USE_OBJ_ALIAS
 
 void hasp_object_tree(const lv_obj_t* parent, uint8_t pageid, uint16_t level);
 

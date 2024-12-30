@@ -90,6 +90,8 @@ void dispatch_state_eventid(const char* topic, hasp_event_t eventid)
     char payload[32];
     char eventname[8];
 
+    LOG_INFO(TAG_MQTT, "dispatch_state_eventid topic[%s] eid[%d]", topic, (uint16_t)eventid);
+
     Parser::get_event_name(eventid, eventname, sizeof(eventname));
     if(eventid == HASP_EVENT_ON || eventid == HASP_EVENT_OFF) {
         snprintf_P(payload, sizeof(payload), PSTR("{\"state\":\"%s\"}"), eventname);
@@ -187,6 +189,59 @@ static inline bool dispatch_parse_button_attribute(const char* topic_p, const ch
     hasp_process_attribute(pageid, objid, topic_p, payload, update);
     return true;
 }
+
+#if USE_OBJ_ALIAS > 0
+static inline bool dispatch_parse_alias_attribute(const char* topic_p, const char* payload, bool update)
+{
+    bool result = false;
+
+    if(*topic_p != '@') return false; // obligated @
+
+    topic_p++;
+
+    const char *pSeperator = strchr(topic_p, '.');
+    uint16_t aliaslen = (uint16_t)(pSeperator-topic_p);
+    
+    uint16_t aliashash = Parser::get_sdbm(topic_p, aliaslen, true);
+    topic_p = pSeperator;
+
+    if(*topic_p != '.') return false; // obligated separator
+
+    topic_p++;
+
+    LOG_DEBUG(TAG_MSGR, "parse alias attribute : obj alias hash[%d] command[%s] payload[%s]", aliashash, topic_p, payload);
+
+    lv_obj_t *top = lv_layer_top();
+
+    /* search object on page 0 */
+    hasp_cmd_process_data_t data = {.topic_p = topic_p, .payload = payload, .update = update};
+    LOG_DEBUG(TAG_MSGR, "parse alias attribute : search page 0 childs[%d]", lv_obj_count_children(top));
+    if (hasp_find_obj_from_alias(top, aliashash, false, &data)) {
+        result = true;
+    }
+
+    /* search object on currently visible page first include subpages (tabview) */
+    uint8_t current_page = haspPages.get();
+    LOG_DEBUG(TAG_MSGR, "parse alias attribute : search page %d childs[%d]", current_page, lv_obj_count_children(haspPages.get_obj(current_page)));
+    if (hasp_find_obj_from_alias(haspPages.get_obj(current_page), aliashash, false, &data)) {
+        result = true;
+    }
+
+    /* search object on all other pages include subpages (tabview) */
+    uint8_t page = HASP_START_PAGE;
+    while (page <= HASP_NUM_PAGES) {
+        if (page != current_page) {
+            LOG_DEBUG(TAG_MSGR, "parse alias attribute : search page %d childs[%d]", page, lv_obj_count_children(haspPages.get_obj(page)));
+            if (hasp_find_obj_from_alias(haspPages.get_obj(page), aliashash, false, &data)) {
+                result = true;
+            }
+        }
+        page++;
+    }
+
+    return result;
+}
+#endif // #if USE_OBJ_ALIAS > 0
 
 static void dispatch_input(const char* topic, const char* payload)
 {
@@ -314,7 +369,17 @@ static void dispatch_command(const char* topic, const char* payload, bool update
 {
     /* ================================= Standard payload commands ======================================= */
 
-    if(dispatch_parse_button_attribute(topic, payload, update)) return; // matched pxby.attr, first for speed
+    if(dispatch_parse_button_attribute(topic, payload, update)) {
+        LOG_DEBUG(TAG_MSGR, "dispatch object matched pxby.attr");
+        return; // matched pxby.attr, first for speed
+    }
+
+#if USE_OBJ_ALIAS > 0
+    if(dispatch_parse_alias_attribute(topic, payload, update)) {
+        LOG_DEBUG(TAG_MSGR, "dispatch object matched alias.attr");
+        return; // matched alias.attr
+    }
+#endif  // #if USE_OBJ_ALIAS > 0
 
     // check and execute commands from commands array
     for(int i = 0; i < nCommands; i++) {
@@ -615,16 +680,28 @@ void dispatch_config(const char* topic, const char* payload, uint8_t source)
 
 void dispatch_normalized_group_values(hasp_update_value_t& value)
 {
-    if(value.group == 0) return;
+//    if(value.group == 0) return;
 
 #if HASP_USE_GPIO > 0
-    gpio_set_normalized_group_values(value); // Update GPIO states first
+    if(value.group) {
+        gpio_set_normalized_group_values(value); // Update GPIO states first
+    }
 #endif
-    object_set_normalized_group_values(value); // Update onsreen objects except originating obj
+
+#if USE_OBJ_ALIAS == 0
+    if(value.group)
+#else
+    if(value.group || value.alias)
+#endif
+    {        
+        object_set_normalized_group_values(value); // Update onsreen objects except originating obj
+    }
 
     LOG_VERBOSE(TAG_MSGR, F("GROUP %d value %d (%d-%d)"), value.group, value.val, value.min, value.max);
 #if HASP_USE_GPIO > 0
-    gpio_output_group_values(value.group); // Output new gpio values
+    if(value.group) {
+        gpio_output_group_values(value.group); // Output new gpio values
+    }
 #endif
 }
 

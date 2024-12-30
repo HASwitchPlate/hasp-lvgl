@@ -68,6 +68,70 @@ bool hasp_find_id_from_obj(const lv_obj_t* obj, uint8_t* pageid, uint8_t* objid)
     return true;
 }
 
+#if USE_OBJ_ALIAS > 0
+/**
+ * Recursive function that find object with given alias and process payload, 
+ * return after all objects checked
+ * 
+ * @param obj Pointer to perent object
+ * @param alias Hash to be searched for
+ * @param toreturn If true, the function returns in case of a match
+ * @param data Data for hasp_process_obj_attribute()
+ * @return pointer to last founded object or NULL if nothing was found
+ */
+lv_obj_t* hasp_find_obj_from_alias(const lv_obj_t* obj, uint16_t alias, bool toreturn, hasp_cmd_process_data_t *data) 
+{
+    lv_obj_t* result = NULL;
+
+    if(!obj || !alias) return NULL;
+
+    // check of page self of match alias
+    if (alias == obj->user_data.aliashash) {
+        // alias match page self
+        LOG_DEBUG(TAG_HASP, "page alias match");
+
+        if (data) {
+            hasp_process_obj_attribute((lv_obj_t*)obj, data->topic_p, data->payload, data->update);
+        }
+        result = (lv_obj_t*)obj;
+        if (toreturn) return result;
+    }
+
+    lv_obj_t* child = lv_obj_get_child_back(obj, NULL);
+    while(child) {
+        LOG_DEBUG(TAG_HASP, "search alias : objid[%d] objtype[%s] ahash[%d]"
+                    , child->user_data.id, obj_get_type_name(child), child->user_data.aliashash);
+
+        if (alias == child->user_data.aliashash) {
+            LOG_DEBUG(TAG_HASP, "alias match");
+
+            if (data) {
+                hasp_process_obj_attribute((lv_obj_t*)child, data->topic_p, data->payload, data->update);
+            }
+            result = child;
+            if (toreturn) return result;
+        }
+        
+        if (obj_check_type(child, LV_HASP_TABVIEW)) {
+            lv_tabview_ext_t * tv_ext = (lv_tabview_ext_t *)lv_obj_get_ext_attr(child);
+            lv_obj_t * tabs = lv_page_get_scrollable(tv_ext->content);
+            // Recursive call for tabs
+            result = hasp_find_obj_from_alias(tabs, alias, toreturn, data);
+        } else if (obj_check_type(child, LV_HASP_TAB)) {
+            lv_obj_t* tab_content_area = lv_obj_get_child_back(child, NULL);
+            // Recursive call for tab content
+            result = hasp_find_obj_from_alias(tab_content_area, alias, toreturn, data);
+        }
+
+        if (toreturn) return result;
+
+        child = lv_obj_get_child_back(obj, child);
+    }
+
+    return result;
+}
+#endif  // #if USE_OBJ_ALIAS > 0
+
 void hasp_object_tree(const lv_obj_t* parent, uint8_t pageid, uint16_t level)
 {
     if(parent == nullptr) return;
@@ -126,7 +190,14 @@ void object_set_group_values(lv_obj_t* parent, hasp_update_value_t& value)
     if(parent == nullptr) return;
 
     // Update object if it's in the same group
-    if(value.group == parent->user_data.groupid && value.obj != parent) {
+#if USE_OBJ_ALIAS == 0
+    if(value.group == parent->user_data.groupid && value.obj != parent)
+#else
+    if(value.obj != parent &&
+       ((value.group > 0 && value.group == parent->user_data.groupid) || 
+        (value.alias > 0 && value.alias == parent->user_data.aliashash)))
+#endif
+    {
         attribute_set_normalized_value(parent, value);
     }
 
@@ -150,13 +221,19 @@ void object_set_group_values(lv_obj_t* parent, hasp_update_value_t& value)
 // SHOULD only by called from DISPATCH
 void object_set_normalized_group_values(hasp_update_value_t& value)
 {
+#if USE_OBJ_ALIAS == 0
     if(value.group == 0 || value.min == value.max) return;
+#else
+    if((value.group == 0 && value.alias == 0) || value.min == value.max) return;
+#endif
 
     uint8_t page = haspPages.get();
     object_set_group_values(haspPages.get_obj(page), value); // Update visible objects first
 
     for(uint8_t i = 0; i < HASP_NUM_PAGES; i++) {
-        if(i != page) object_set_group_values(haspPages.get_obj(i), value);
+        if(i != page) {
+            object_set_group_values(haspPages.get_obj(i), value);
+        }
     }
 }
 

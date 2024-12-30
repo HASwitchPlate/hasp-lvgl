@@ -1797,6 +1797,16 @@ static hasp_attribute_type_t attribute_common_text(lv_obj_t* obj, uint16_t attr_
         }
     }
 
+#if USE_OBJ_ALIAS > 0
+    if(attr_hash == ATTR_ALIAS) {
+        if(update) {
+            my_obj_set_alias(obj, payload);
+        } else {
+            *text = (char*)my_obj_get_alias(obj);
+        }
+    }
+#endif  // #if USE_OBJ_ALIAS > 0
+
     return HASP_ATTR_TYPE_STR;
 }
 
@@ -2186,6 +2196,15 @@ static hasp_attribute_type_t attribute_common_val(lv_obj_t* obj, int32_t& val, b
                 val = lv_tabview_get_tab_act(obj);
             break;
 
+        case LV_HASP_CPICKER:
+            if(update) {
+                lv_cpicker_set_color(obj, lv_color_hex(val));
+            } else {
+                lv_color_t color = lv_cpicker_get_color(obj);
+                val = lv_color_to32(color);                
+            }
+            break;
+
         default:
             return HASP_ATTR_TYPE_NOT_FOUND; // not found
     }
@@ -2198,23 +2217,28 @@ bool attribute_set_normalized_value(lv_obj_t* obj, hasp_update_value_t& value)
     if(value.min == value.max) return false; // would cause divide by zero error
 
     int32_t val;
-    int32_t min;
-    int32_t max;
-    if(!my_obj_get_range(obj, min, max)) return false; // range could not be determined
 
-    // Limit the value between min and max, adjust if power = 0
-    if(value.power == 0 || value.val <= value.min) {
-        val = value.min;
-    } else if(value.val >= value.max) {
-        val = value.max;
+    if (obj_get_type(obj) != LV_HASP_CPICKER) {
+        int32_t min;
+        int32_t max;
+        if(!my_obj_get_range(obj, min, max)) return false; // range could not be determined
+
+        // Limit the value between min and max, adjust if power = 0
+        if(value.power == 0 || value.val <= value.min) {
+            val = value.min;
+        } else if(value.val >= value.max) {
+            val = value.max;
+        } else {
+            val = value.val;
+        }
+    
+        if(min == 0 && max == 1) {
+            val = val != value.min; // Toggles are set to 0 when val = min, otherwise 1
+        } else {
+            val = map(val, value.min, value.max, min, max);
+        }
     } else {
         val = value.val;
-    }
-
-    if(min == 0 && max == 1) {
-        val = val != value.min; // Toggles are set to 0 when val = min, otherwise 1
-    } else {
-        val = map(val, value.min, value.max, min, max);
     }
 
     attribute_common_val(obj, val, true);
@@ -2703,6 +2727,9 @@ void hasp_process_obj_attribute(lv_obj_t* obj, const char* attribute, const char
         //     LOG_WARNING(TAG_HASP, F(D_ATTRIBUTE_OBSOLETE D_ATTRIBUTE_INSTEAD), attribute, "text");
         case ATTR_TEXT:
         case ATTR_TEMPLATE:
+#if USE_OBJ_ALIAS > 0
+        case ATTR_ALIAS:
+#endif  // #if USE_OBJ_ALIAS > 0
             ret = attribute_common_text(obj, attr_hash, payload, &text, update);
             break;
 

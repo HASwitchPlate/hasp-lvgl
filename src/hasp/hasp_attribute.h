@@ -18,9 +18,11 @@ void my_obj_set_value_str_text(lv_obj_t* obj, uint8_t part, lv_state_t state, co
 void my_obj_set_tag(lv_obj_t* obj, const char* tag);
 void my_obj_set_action(lv_obj_t* obj, const char* tag);
 void my_obj_set_swipe(lv_obj_t* obj, const char* tag);
+void my_obj_set_alias(lv_obj_t* obj, const char* text);
 const char* my_obj_get_tag(lv_obj_t* obj);
 const char* my_obj_get_action(lv_obj_t* obj);
 const char* my_obj_get_swipe(lv_obj_t* obj);
+const char* my_obj_get_alias(lv_obj_t* obj);
 void my_btnmatrix_map_clear(lv_obj_t* obj);
 void my_msgbox_map_clear(lv_obj_t* obj);
 void my_line_clear_points(lv_obj_t* obj);
@@ -501,6 +503,7 @@ _HASP_ATTRIBUTE(SCALE_END_LINE_WIDTH, scale_end_line_width, lv_style_int_t)
 #define ATTR_GROUPID 48986
 #define ATTR_OBJID 41010
 #define ATTR_OBJ 53623
+#define ATTR_ALIAS 33840
 
 #define ATTR_TEXT_MAC 38107
 #define ATTR_TEXT_IP 41785
