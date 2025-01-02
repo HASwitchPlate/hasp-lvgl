@@ -19,7 +19,7 @@
 
 #define BACKLIGHT_CHANNEL 0 // pwm channel 0-15
 
-#if HASP_USE_SPIFFS > 0 || HASP_USE_LITTLEFS > 0
+#if HASP_USE_SPIFFS > 0 || HASP_USE_LITTLEFS > 0 || HASP_USE_SDCARD
 File pFileOut;
 #endif
 

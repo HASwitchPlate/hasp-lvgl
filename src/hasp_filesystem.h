@@ -8,6 +8,7 @@
 #include <FS.h>
 
 bool filesystemSetup(void);
+bool sdcardSetup(void);
 
 void filesystemList();
 void filesystemInfo();
@@ -50,6 +51,14 @@ typedef struct
 #define HASP_FS LITTLEFS
 #endif // ESP_ARDUINO_VERSION
 
+#if HASP_USE_SDCARD > 0
+#include "SPI.h"
+#include "SD.h"
+#include "FS.h"
+#define HASP_SD_FS SD
+
+#endif
+
 #endif
 
 #elif defined(ARDUINO_ARCH_ESP8266)
@@ -66,6 +75,7 @@ typedef struct
 #if defined(ARDUINO_ARCH_ESP32)
 void filesystemUnzip(const char*, const char* filename, uint8_t source);
 String filesystem_list(fs::FS& fs, const char* dirname, uint8_t levels);
+void listDir_SD(fs::FS &fs, const char *dirname, uint8_t levels); 
 #endif
 
 #endif // HASP_FILESYSTEM_H
