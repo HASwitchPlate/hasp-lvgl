@@ -380,6 +380,32 @@ lgfx::ITouch* _init_touch(Preferences* preferences)
     }
 #endif
 
+#if TOUCH_DRIVER == 0x0820
+
+    { // タッチスクリーン制御の設定を行います。（必要なければ削除）
+        auto touch = new lgfx::Touch_FT5x06();
+        auto cfg   = touch->config();
+
+        cfg.x_min      = 0;              // The minimum X value obtained from the touchscreen (raw value).
+        cfg.x_max      = TFT_WIDTH - 1;  // The maximum X value obtained from the touchscreen (raw value).
+        cfg.y_min      = 0;              // The minimum Y value obtained from the touchscreen (raw value).
+        cfg.y_max      = TFT_HEIGHT - 1; // The maximum Y value obtained from the touchscreen (raw value).
+        cfg.bus_shared = true;           // If using a common bus with the screen, set it to true.
+        cfg.offset_rotation = TOUCH_OFFSET_ROTATION; // Adjustment when the display orientation does not match the touch orientation. Set in values from 0 to 7.
+
+        // I2C接続の場合
+        cfg.i2c_port = I2C_TOUCH_PORT;      // 使用するI2Cを選択 (0 or 1)
+        cfg.i2c_addr = I2C_TOUCH_ADDRESS;   // I2Cデバイスアドレス番号
+        cfg.pin_sda  = TOUCH_SDA;           // SDAが接続されているピン番号
+        cfg.pin_scl  = TOUCH_SCL;           // SCLが接続されているピン番号
+        cfg.pin_int  = TOUCH_IRQ;           // INTが接続されているピン番号
+        cfg.freq     = I2C_TOUCH_FREQUENCY; // I2Cクロックを設定
+
+        touch->config(cfg);
+        return touch;
+    }
+#endif
+
 #if TOUCH_DRIVER == 0x6336
     {
         auto touch = new lgfx::Touch_FT5x06();
