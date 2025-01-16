@@ -180,7 +180,7 @@ void filesystemList()
 #else
     if(!HASP_FS.begin(true)) {            // default vfs path: /littlefs
 #endif
-        LOG_ERROR(TAG_FILE, F("Flash file system not mounted."));
+        LOG_ERROR(TAG_FILE, F("Flash file system not mouted."));
     } else {
 
         LOG_VERBOSE(TAG_FILE, F("Listing files on the internal flash:"));
@@ -204,6 +204,38 @@ void filesystemList()
 }
 
 #if defined(ARDUINO_ARCH_ESP32)
+
+void listDir_SD(fs::FS &fs, const char *dirname, uint8_t levels) {
+  LOG_VERBOSE(TAG_FILE, "Listing directory: %s\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    LOG_WARNING(TAG_FILE, "Failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    LOG_WARNING(TAG_FILE, "Not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      LOG_VERBOSE(TAG_FILE, "  DIR : ");
+      Serial.println(file.name());
+      if (levels) {
+        listDir_SD(fs, file.path(), levels - 1);
+      }
+    } else {
+      LOG_VERBOSE(TAG_FILE, "  FILE: ");
+      LOG_VERBOSE(TAG_FILE, "%s ", file.name());
+      LOG_VERBOSE(TAG_FILE, "  SIZE: ");
+      LOG_VERBOSE(TAG_FILE, "%d\n", file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
 String filesystem_list(fs::FS& fs, const char* dirname, uint8_t levels)
 {
     LOG_VERBOSE(TAG_FILE, "Listing directory: %s\n", dirname);
@@ -281,6 +313,29 @@ void filesystemSetupFiles()
 #ifdef HASP_MQTT_OFF_CMD
     filesystem_write_file("/mqtt_off.cmd", HASP_MQTT_OFF_CMD, strlen(HASP_MQTT_OFF_CMD));
 #endif
+}
+bool sdcardSetup(void)
+{
+    bool flag = false;
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, HIGH);
+    SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
+    LOG_INFO(TAG_FILE, "sdcardSetup...");
+
+    if (!HASP_SD_FS.begin(SD_CS, SPI, 1000000)) {
+        LOG_ERROR(TAG_FILE, F("SD Card Mount Failed"));
+        return flag;
+    }
+    uint8_t cardType = HASP_SD_FS.cardType();
+    if (cardType == CARD_NONE) {
+        LOG_ERROR(TAG_FILE, F("No SD card attached"));
+        return flag;
+    }
+    uint64_t cardSize = HASP_SD_FS.cardSize() / (1024 * 1024);
+    LOG_INFO(TAG_FILE, "TF Card Size: %lluMB\n", cardSize);
+    //listDir_SD(HASP_SD_FS, "/", 2);
+    flag = true;
+    return flag;
 }
 
 bool filesystemSetup(void)

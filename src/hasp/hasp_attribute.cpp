@@ -23,8 +23,8 @@ LV_FONT_DECLARE(unscii_8_icon);
 extern const char** btnmatrix_default_map; // memory pointer to lvgl default btnmatrix map
 extern const char* msgbox_default_map[];   // memory pointer to lvgl default btnmatrix map
 
-// extern const uint8_t rootca_crt_bundle_start[] asm("_binary_data_cert_x509_crt_bundle_bin_start");
-// extern const uint8_t rootca_crt_bundle_end[] asm("_binary_data_cert_x509_crt_bundle_bin_end");
+//extern const uint8_t rootca_crt_bundle_start[] asm("_binary_data_cert_x509_crt_bundle_bin_start");
+//extern const uint8_t rootca_crt_bundle_end[] asm("_binary_data_cert_x509_crt_bundle_bin_end");
 
 void my_image_release_resources(lv_obj_t* obj)
 {
@@ -98,7 +98,7 @@ const char** my_map_create(const char* payload)
 {
     // Reserve memory for JsonDocument
     // StaticJsonDocument<1024> map_doc;
-    size_t maxsize = (128u * ((strlen(payload) / 128) + 1)) + 1024;
+    size_t maxsize = (128u * ((strlen(payload) / 128) + 1)) + 256;
     DynamicJsonDocument map_doc(maxsize);
     DeserializationError jsonError = deserializeJson(map_doc, payload);
 
@@ -398,7 +398,6 @@ static void hasp_attribute_get_part_state_new(lv_obj_t* obj, const char* attr_in
         case LV_HASP_IMGBTN:
         case LV_HASP_OBJECT:
         case LV_HASP_TAB:
-        case LV_HASP_QRCODE:
             part = LV_BTN_PART_MAIN;
             break;
 
@@ -1325,16 +1324,120 @@ static inline bool do_attribute(T& list, lv_obj_t* obj, uint16_t attr_hash, int3
 
 static hasp_attribute_type_t special_attribute_src(lv_obj_t* obj, const char* payload, char** text, bool update)
 {
+    LOG_ERROR(TAG_ATTR, "PAYLOAD %s", payload);
     if(!obj_check_type(obj, LV_HASP_IMAGE)) return HASP_ATTR_TYPE_NOT_FOUND;
 
     if(update) {
-
         if(payload != strstr_P(payload, PSTR("http://")) &&  // not start with http
            payload != strstr_P(payload, PSTR("https://"))) { // not start with https
 
             if(payload == strstr_P(payload, PSTR("L:"))) { // startsWith command/
                 my_image_release_resources(obj);
                 lv_img_set_src(obj, payload);
+            } else if (payload == strstr_P(payload, PSTR("Z:"))) { 
+              // if (HASP_SD_FS.exists("/b.png"))
+                char tempsrcf[64] = "";
+                strncpy(tempsrcf , payload + 2, sizeof(tempsrcf));
+                LOG_ERROR(TAG_ATTR, "PAYLOAD DENTRO %s", tempsrcf);
+
+
+               int readf = 0;
+               File file;
+               file = HASP_SD_FS.open(tempsrcf, "r");
+    
+
+               int buf_lenf = file.size();
+               LOG_ERROR(TAG_ATTR, "size %d", buf_lenf);
+
+               int dsc_lenf = sizeof(lv_img_dsc_t);
+               lv_img_dsc_t* img_dscf = (lv_img_dsc_t*)lv_mem_alloc(dsc_lenf); 
+               uint8_t* img_buf_startf = (uint8_t*)(buf_lenf > 0 ? hasp_malloc(buf_lenf) : NULL);
+               uint8_t* img_buf_posf   = img_buf_startf;
+
+
+               // Initialize the buffers
+               memset(img_buf_startf, 0, buf_lenf);           // empty data buffer
+               memset(img_dscf, 0, dsc_lenf);                 // empty img descriptor + url
+               img_dscf->data               = img_buf_startf; // store pointer to the start of the data buffer
+               if(!img_buf_startf) {
+                    lv_mem_free(img_dscf); // destroy header too
+                    LOG_ERROR(TAG_ATTR, "img buffer creation failed %d", buf_lenf);
+                    return HASP_ATTR_TYPE_STR;
+                }
+                // Read image header
+                readf                      = 0;
+                const uint8_t png_magic[] = {0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+                if(file.available() >= 8) {
+                    int c = file.readBytes((char *)img_buf_posf, 8); // don't read too far
+
+                    if(!memcmp(png_magic, img_buf_posf, sizeof(png_magic))) {
+                        // PNG image, keep all data and advance buffer
+                        LOG_VERBOSE(TAG_ATTR, D_BULLET "PNG HEADER: %d bytes read=%d buf_len=%d", c, readf, buf_lenf);
+                        img_buf_posf += c;
+                        buf_lenf -= c;
+                        readf += c;
+                    } else {
+                        // BIN format, copy the header
+                        lv_img_header_t* header     = (lv_img_header_t*)img_buf_posf;
+                        img_dscf->header.always_zero = 0;
+                        img_dscf->header.w           = header->w;
+                        img_dscf->header.h           = header->h;
+                        img_dscf->header.cf          = header->cf;
+
+                        LOG_VERBOSE(TAG_ATTR, D_BULLET "BIN image: w=%d h=%d cf=%d len=%d", img_dscf->header.w,
+                                    img_dscf->header.h, img_dscf->header.cf, img_dscf->data_size);
+                        img_buf_posf += sizeof(lv_img_header_t);
+                        // shift remainder of 8 data-bytes to the start of the buffer
+                        memcpy(img_buf_startf, img_buf_posf, 8U - sizeof(lv_img_header_t));
+                        buf_lenf -= c;
+                        readf += c;
+                    }
+                } else {
+                    // disconnected
+                    hasp_free(img_buf_startf);
+                    lv_mem_free(img_dscf); // destroy header too
+                    LOG_ERROR(TAG_ATTR, "img header read failed %d", buf_lenf);
+                    file.close();
+                    return HASP_ATTR_TYPE_STR;
+                }
+
+                // Read image data
+                while( (buf_lenf > 0)) {
+                    if(size_t size = file.available()) {
+                        int c = file.readBytes((char *)img_buf_posf, size > buf_lenf ? buf_lenf : size); // don't read too far
+                        LOG_DEBUG(TAG_ATTR, "%s %d %x -> %x", __FILE__, __LINE__, img_dscf->data, img_buff);
+                        img_buf_posf += c;
+                        buf_lenf -= c;
+                        LOG_DEBUG(TAG_ATTR, D_BULLET "IMG DATA: %d bytes read=%d buf_len=%d", c, readf, buf_lenf);
+                        readf += c;
+                    } else {
+                        delay(1); // wait for data
+                    }
+                }
+
+                if(!memcmp(png_magic, img_dscf->data, sizeof(png_magic))) {
+                    // PNG format, get image size from header
+                    img_dscf->header.always_zero = 0;
+                    img_dscf->header.w           = img_buf_startf[19] + (img_buf_startf[18] << 8);
+                    img_dscf->header.h           = img_buf_startf[23] + (img_buf_startf[22] << 8);
+                    img_dscf->data_size          = img_buf_posf - img_buf_startf; // end of buffer - start of buffer
+                    img_dscf->header.cf          = LV_IMG_CF_RAW_ALPHA;
+                    LOG_VERBOSE(TAG_ATTR, D_BULLET "PNG image: w=%d h=%d cf=%d len=%d", img_dscf->header.w,
+                                img_dscf->header.h, img_dscf->header.cf, img_dscf->data_size);
+                } else {
+                    img_dscf->data_size = img_buf_posf - img_buf_startf - sizeof(lv_img_header_t); // end buf - start buf
+                    LOG_VERBOSE(TAG_ATTR, D_BULLET "BIN image: w=%d h=%d cf=%d len=%d", img_dscf->header.w,
+                                img_dscf->header.h, img_dscf->header.cf, img_dscf->data_size);
+                }
+                file.close();
+                my_image_release_resources(obj);
+                lv_img_set_src(obj, img_dscf);
+                //hasp_free(img_buf_startf);
+                LOG_VERBOSE(TAG_ATTR, F("Funciona %s"), payload);
+                //lv_mem_free(img_dscf); // NO LOP DESTUYASSSS cuando pongas
+                //lv_img_set_src(obj, img_dscf);
+                LOG_DEBUG(TAG_ATTR, "%s %d %x -> %x", __FILE__, __LINE__, img_buf_startf, img_buf_start_posf);
+
 
             } else if(payload == strstr_P(payload, PSTR("/littlefs/"))) { // startsWith command/
                 char tempsrc[64] = "L:";
@@ -1757,9 +1860,6 @@ static hasp_attribute_type_t attribute_common_text(lv_obj_t* obj, uint16_t attr_
         {LV_HASP_TAB, ATTR_TEXT, my_tab_set_text, my_tab_get_text},
 #if LV_USE_WIN != 0
         {LV_HASP_WINDOW, ATTR_TEXT, lv_win_set_title, lv_win_get_title},
-#endif
-#if HASP_USE_QRCODE > 0
-        {LV_HASP_QRCODE, ATTR_TEXT, my_qrcode_set_text, my_qrcode_get_text},
 #endif
         {LV_HASP_MSGBOX, ATTR_TEXT, my_msgbox_set_text, lv_msgbox_get_text}
     };
@@ -2378,12 +2478,12 @@ static hasp_attribute_type_t attribute_common_int(lv_obj_t* obj, uint16_t attr_h
                 val = obj->user_data.groupid;
             break; // attribute_found
 
-            // case ATTR_TRANSITION:
-            //     if(update)
-            //         obj->user_data.transitionid = (uint8_t)val;
-            //     else
-            //         val = obj->user_data.transitionid;
-            //     break; // attribute_found
+        // case ATTR_TRANSITION:
+        //     if(update)
+        //         obj->user_data.transitionid = (uint8_t)val;
+        //     else
+        //         val = obj->user_data.transitionid;
+        //     break; // attribute_found
 
         case ATTR_OBJID:
             if(update && val != obj->user_data.objid) return HASP_ATTR_TYPE_INT_READONLY;
@@ -2455,18 +2555,6 @@ static hasp_attribute_type_t attribute_common_int(lv_obj_t* obj, uint16_t attr_h
                 val = lv_obj_get_ext_click_pad_top(obj);
             break; // attribute_found
 
-#if HASP_USE_QRCODE > 0
-        case ATTR_SIZE:
-            if(obj_check_type(obj, LV_HASP_QRCODE)) {
-                if(update) {
-                    lv_qrcode_set_size(obj, val);
-                } else {
-                    val = lv_obj_get_width(obj);
-                }
-            }
-            break;
-#endif
-
         default:
             return HASP_ATTR_TYPE_NOT_FOUND; // attribute_not found
     }
@@ -2516,12 +2604,12 @@ static hasp_attribute_type_t attribute_common_bool(lv_obj_t* obj, uint16_t attr_
                 val = !(lv_obj_get_state(obj, LV_BTN_PART_MAIN) & LV_STATE_DISABLED);
             break; // attribute_found
 
-            // case ATTR_SWIPE:
-            //     if(update)
-            //         obj->user_data.swipeid = (!!val) % 16;
-            //     else
-            //         val = obj->user_data.swipeid;
-            //     break; // attribute_found
+        // case ATTR_SWIPE:
+        //     if(update)
+        //         obj->user_data.swipeid = (!!val) % 16;
+        //     else
+        //         val = obj->user_data.swipeid;
+        //     break; // attribute_found
 
         case ATTR_TOGGLE:
             switch(obj_get_type(obj)) {
@@ -2669,7 +2757,6 @@ void hasp_process_obj_attribute(lv_obj_t* obj, const char* attribute, const char
         case ATTR_OPACITY:
         case ATTR_EXT_CLICK_H:
         case ATTR_EXT_CLICK_V:
-        case ATTR_SIZE:
             val = strtol(payload, nullptr, DEC);
             ret = attribute_common_int(obj, attr_hash, val, update);
             break;

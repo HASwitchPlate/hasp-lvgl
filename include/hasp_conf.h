@@ -154,7 +154,7 @@
 #endif
 
 #ifndef HASP_USE_SDCARD
-#define HASP_USE_SDCARD 0
+#define HASP_USE_SDCARD 1
 #endif
 
 #ifndef HASP_USE_GPIO
