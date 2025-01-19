@@ -70,6 +70,7 @@
  *        Interface Language Settings
  **************************************************/
 #define HASP_LANGUAGE en_US // English
+//#define HASP_LANGUAGE ru_RU                        // Russian
 // #define HASP_LANGUAGE es_ES                       // Spanish
 // #define HASP_LANGUAGE fr_FR                       // French
 // #define HASP_LANGUAGE hu_HU                       // Hungarian
