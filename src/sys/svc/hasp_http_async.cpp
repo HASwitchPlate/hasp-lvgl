@@ -1297,7 +1297,12 @@ void webHandleGuiConfig(AsyncWebServerRequest* request)
         httpMessage += getOption(4, F("180 degrees - mirrored"), rotation == 4);
         httpMessage += getOption(5, F("270 degrees - mirrored"), rotation == 5);
         httpMessage += F("</select></p>");
-
+#ifdef NOISE_REDUCTION
+        httpMessage += F("<p><b>Noise Reduction</b> <input id='noise_reduction' required "
+                         "name='noise_reduction' type='number' min='0' max='15' value='");
+        int8_t noise_reduction = settings[FPSTR(FP_GUI_NOISE_REDUCTION)].as<int8_t>();
+        httpMessage += F("'></p>");
+#endif
         httpMessage += F("<p><input id='inv' name='inv' type='checkbox' ");
         if(settings[FPSTR(FP_GUI_INVERT)].as<bool>()) httpMessage += F(" checked");
         httpMessage += F("><b>Invert Colors</b>");

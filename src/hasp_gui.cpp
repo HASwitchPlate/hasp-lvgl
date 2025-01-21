@@ -46,6 +46,7 @@ gui_conf_t gui_settings = {.show_pointer   = false,
                            .backlight_pin  = TFT_BCKL,
                            .rotation       = TFT_ROTATION,
                            .invert_display = INVERT_COLORS,
+                           .noise_reduction = 5,
                            .cal_data       = {0, 65535, 0, 65535, 0}};
 lv_obj_t* cursor;
 
@@ -347,6 +348,9 @@ void guiSetup()
 #if HASP_TARGET_ARDUINO
     // drv_touch_init(gui_settings.rotation); // Touch driver
     haspTouch.init(tft_width, tft_height);
+#ifdef NOISE_REDUCTION
+    haspTouch.setup_noise_reduction(gui_settings.noise_reduction);
+#endif
     haspTouch.set_calibration(gui_settings.cal_data);
     haspTouch.set_rotation(gui_settings.rotation);
 #endif
@@ -487,7 +491,10 @@ bool guiGetConfig(const JsonObject& settings)
 
     if(gui_settings.rotation != settings[FPSTR(FP_GUI_ROTATION)].as<uint8_t>()) changed = true;
     settings[FPSTR(FP_GUI_ROTATION)] = gui_settings.rotation;
-
+#ifdef NOISE_REDUCTION
+    if(gui_settings.noise_reduction != settings[FPSTR(FP_GUI_NOISE_REDUCTION)].as<uint8_t>()) changed = true;
+    settings[FPSTR(FP_GUI_NOISE_REDUCTION)] = gui_settings.noise_reduction;
+#endif
     if(gui_settings.show_pointer != settings[FPSTR(FP_GUI_POINTER)].as<bool>()) changed = true;
     settings[FPSTR(FP_GUI_POINTER)] = (uint8_t)gui_settings.show_pointer;
 
@@ -562,6 +569,9 @@ bool guiSetConfig(const JsonObject& settings)
     changed |= configSet(guiSleepTime1, settings[FPSTR(FP_GUI_IDLEPERIOD1)], F("guiSleepTime1"));
     changed |= configSet(guiSleepTime2, settings[FPSTR(FP_GUI_IDLEPERIOD2)], F("guiSleepTime2"));
     changed |= configSet(gui_settings.rotation, settings[FPSTR(FP_GUI_ROTATION)], F("gui_settings.rotation"));
+#ifdef NOISE_REDUCTION
+    changed |= configSet(gui_settings.noise_reduction, settings[FPSTR(FP_GUI_NOISE_REDUCTION)], F("gui_settings.noise_reduction"));
+#endif
     changed |= configSet(gui_settings.invert_display, settings[FPSTR(FP_GUI_INVERT)], F("guiInvertDisplay"));
 
     hasp_set_sleep_time(guiSleepTime1, guiSleepTime2);

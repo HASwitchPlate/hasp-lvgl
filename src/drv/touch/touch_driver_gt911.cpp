@@ -92,9 +92,60 @@ IRAM_ATTR bool TouchGt911::read(lv_indev_drv_t* indev_driver, lv_indev_data_t* d
     return false;
 }
 
+#ifdef NOISE_REDUCTION
+void TouchGt911::setup_noise_reduction(uint8_t nr_level)
+{
+    uint8_t len = 0x8100 - GT_REG_CFG;
+    uint8_t cfg[len];
+    GTInfo* info;
+    uint8_t err;
+
+    memset(cfg, 0, len);
+/*    This is the only way to read the entire config space.
+    The Goodix driver provides a readConfig() function, but
+    struct is not packed which leads to errors (when using
+    struct members).
+
+    Need to do a split read as the WDT will bite for reads
+    of more than 128 bytes (give or take).
+*/
+    err = touch.read(GT_REG_CFG, cfg, 100);
+    if (err != 0) goto end2;
+    if (cfg[11] == nr_level) {
+        LOG_INFO(TAG_DRVR, "GT911 noise reduction unchanged");
+        return;
+    }
+    err = touch.read(GT_REG_CFG+100, cfg+100, len-100);
+    if (err != 0) goto end2;
+
+    if (cfg[len - 1] != touch.calcChecksum(cfg, len - 1)) goto end2;
+
+    // Check noise_reduction is within limits
+    if (nr_level < 0 || nr_level > 15) {
+        LOG_ERROR(TAG_DRVR, "GT911 Noise Reduction value out of range (0-15)");
+        return;
+    }
+    cfg[11] = nr_level;
+    cfg[len - 1] = touch.calcChecksum(cfg, len - 1);
+
+    err = touch.write(GT_REG_CFG, cfg, len);
+    if (err != 0) goto end;
+    err = touch.write(0x8100, 1);
+    if (err != 0) goto end;
+    LOG_INFO(TAG_DRVR, "GT911 noise reduction updated");
+    return;
+end:
+    LOG_ERROR(TAG_DRVR, "GT911 Failed to write noise reduction byte");
+    return;
+end2:
+    LOG_ERROR(TAG_DRVR, "GT911 Failed to read config space");
+}
+#endif
+
 void TouchGt911::init(int w, int h)
 {
     Wire.begin(TOUCH_SDA, TOUCH_SCL, (uint32_t)I2C_TOUCH_FREQUENCY);
+
     touch.setHandler(GT911_setXY);
     GTInfo* info;
 
@@ -102,7 +153,7 @@ void TouchGt911::init(int w, int h)
         info = touch.readInfo();
         if(info->xResolution > 0 && info->yResolution > 0) goto found;
     }
-    
+
 #if TOUCH_IRQ == -1
     // Probe both addresses if IRQ is not connected
     for(uint8_t i = 0; i < 4; i++)

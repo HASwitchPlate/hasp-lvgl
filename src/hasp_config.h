@@ -80,6 +80,7 @@ const char FP_CONFIG_VPN_IP[] PROGMEM          = "vpnip";
 const char FP_CONFIG_PRIVATE_KEY[] PROGMEM     = "privkey";
 const char FP_CONFIG_PUBLIC_KEY[] PROGMEM      = "pubkey";
 const char FP_GUI_ROTATION[] PROGMEM           = "rotate";
+const char FP_GUI_NOISE_REDUCTION[] PROGMEM    = "noise_reduction";
 const char FP_GUI_INVERT[] PROGMEM             = "invert";
 const char FP_GUI_TICKPERIOD[] PROGMEM         = "tick";
 const char FP_GUI_IDLEPERIOD1[] PROGMEM        = "idle1";
