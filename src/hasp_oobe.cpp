@@ -190,7 +190,11 @@ static void oobeSetupSsid(void)
 
     lv_coord_t leftmargin, topmargin, voffset;
     lv_align_t labelpos;
+#if USE_OBJ_ALIAS > 0
+    lv_obj_user_data_t udata = {0, 0, 0, NULL, 0, NULL};
+#else
     lv_obj_user_data_t udata = {0, 0, 0};
+#endif
 
     lv_disp_t* disp = lv_disp_get_default();
     if(disp->driver.hor_res <= disp->driver.ver_res) {

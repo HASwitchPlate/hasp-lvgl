@@ -167,13 +167,29 @@ void Parser::get_event_name(uint8_t eventid, char* buffer, size_t size)
     }
 }
 
-/* 16-bit hashing function http://www.cse.yorku.ca/~oz/hash.html */
-/* all possible attributes are hashed and checked if they are unique */
-uint16_t Parser::get_sdbm(const char* str)
+/** ***************************************************************************
+ * @brief 16-bit hashing function http://www.cse.yorku.ca/~oz/hash.html
+ * all possible attributes are hashed and checked if they are unique
+ *
+ * To calculate the attribute hashes, digits must be "false", otherwise
+ * attributes such as "bg_color01" will not work. I think for aliases
+ * digits is better "true", so that lamp1 and lamp2 provide a different hash.
+ * 
+ * @param str : pointer to text to be hashed
+ * @param len : maximum number of characters on which the hash is calculated
+ * @param digis : false=digits are not included; true=digits are included
+ * @return hash of given text
+ ************************************************************************** **/
+uint16_t Parser::get_sdbm(const char* str, uint16_t len, bool digits)
 {
     uint16_t hash = 0;
-    while(char c = tolower(*str++))
-        if(c > 57 || c < 48) hash = c + (hash << 6) - hash; // exclude numbers which can cause collisions
+    char c;
+    while( (c = tolower(*str++) ) && len) {
+        if(c > 57 || c < 48 || digits) {
+            hash = c + (hash << 6) - hash; // exclude numbers which can cause collisions
+        }
+        len--;
+    }
     return hash;
 }
 

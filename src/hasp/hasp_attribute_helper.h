@@ -852,6 +852,58 @@ static uint16_t my_btnmatrix_get_count(const lv_obj_t* btnm)
     return ext->btn_cnt;
 }
 
+#if USE_OBJ_ALIAS > 0
+/**
+ * Get the text of alias
+ * @param obj pointer to perent object
+ * @return alias text
+ */
+const char* my_obj_get_alias(lv_obj_t* obj)
+{
+    if(!obj) return NULL;
+
+    return obj->user_data.alias;
+}
+
+/**
+ * Set the alias of an object
+ * @param obj pointer to object
+ * @param text alias text
+ */
+void my_obj_set_alias(lv_obj_t* obj, const char* text)
+{
+    // If exist old alias string, free up memory
+    if(obj->user_data.alias) {
+        hasp_free(obj->user_data.alias);
+        obj->user_data.aliashash = 0; 
+        obj->user_data.alias = NULL;
+    }
+
+    // new alias is blank
+    if(text == NULL || text[0] == '\0') {
+        obj->user_data.aliashash = 0; 
+        obj->user_data.alias = NULL;
+        return; 
+    }
+
+    // calculate hash
+    uint16_t hash = Parser::get_sdbm(text, UINT16_MAX, true);
+
+    // store alias hash in object
+    obj->user_data.aliashash = hash; 
+
+    // allocate mem for store alias text and save the pointer in object
+    const size_t size = strlen(text);
+    if(char* str = (char*)hasp_malloc(size + 1)) {
+        strncpy(str, text, size + 1);   // copy include 0 termination
+        str[size] = '\0';   // safety 0 termination
+        obj->user_data.alias = str;
+    } 
+
+    return;
+}
+#endif // USE_OBJ_ALIAS
+
 #if 0
 static bool attribute_lookup_lv_property(uint16_t hash, uint8_t * prop)
 {

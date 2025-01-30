@@ -15,7 +15,7 @@ class Parser {
     static bool get_event_state(uint8_t eventid);
     static void get_event_name(uint8_t eventid, char* buffer, size_t size);
     static uint8_t get_action_id(const char* action);
-    static uint16_t get_sdbm(const char* str);
+    static uint16_t get_sdbm(const char* str, uint16_t len = UINT16_MAX, bool digits=false);
     static bool is_true(const char* s);
     static bool is_true(JsonVariant json);
     static bool is_only_digits(const char* s);

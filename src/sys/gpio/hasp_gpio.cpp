@@ -54,7 +54,17 @@ static inline void gpio_input_event(uint8_t pin, hasp_event_t eventid);
 
 static inline void gpio_update_group(uint8_t group, lv_obj_t* obj, bool power, int32_t val, int32_t min, int32_t max)
 {
-    hasp_update_value_t value = {.obj = obj, .group = group, .min = min, .max = max, .val = val, .power = power};
+    hasp_update_value_t value = {
+                      .obj = obj
+                    , .group = group
+                    , .min = min
+                    , .max = max
+                    , .val = val
+                    , .power = power 
+#if USE_OBJ_ALIAS > 0
+                    , .alias = 0
+#endif                    
+                    };
     dispatch_normalized_group_values(value);
 }
 
